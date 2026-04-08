@@ -51,8 +51,17 @@ def transcribe_audio(file_path: str) -> str:
             language=None,          # auto-detect Arabic/English
             beam_size=5,
             vad_filter=True,        # skip silent segments automatically
-            vad_parameters=dict(min_silence_duration_ms=500),
+            vad_parameters=dict(
+                threshold=0.75,              # 0.0–1.0: higher = only confident speech (default ~0.5)
+                min_speech_duration_ms=500,  # ignore bursts shorter than 0.5s (filters clicks/coughs)
+                min_silence_duration_ms=600, # gap needed to split segments
+                speech_pad_ms=200,           # padding around detected speech
+            ),
         )
+
+        # Extra guard: discard if Whisper itself isn't confident
+        # avg_logprob < -1.0 means it was mostly guessing at noise
+        segments = [s for s in segments if s.avg_logprob > -1.0 and s.no_speech_prob < 0.6]
 
         text = " ".join(seg.text.strip() for seg in segments).strip()
         return text

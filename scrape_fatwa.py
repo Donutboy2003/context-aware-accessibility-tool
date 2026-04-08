@@ -230,9 +230,9 @@ def write_words(
 
 def main():
     parser = argparse.ArgumentParser(description="Scrape fatwa.ca → blog_words.txt")
-    parser.add_argument("--top",      type=int,   default=2000,                    help="Top N words (default 500)")
-    parser.add_argument("--min-len",  type=int,   default=3,                      help="Min word length (default 4)")
-    parser.add_argument("--min-freq", type=int,   default=1,                      help="Min frequency (default 3)")
+    parser.add_argument("--top",      type=int,   default=5000,                    help="Top N words (default 5000)")
+    parser.add_argument("--min-len",  type=int,   default=3,                      help="Min word length (default 3)")
+    parser.add_argument("--min-freq", type=int,   default=1,                      help="Min frequency (default 1)")
     parser.add_argument("--delay",    type=float, default=0.3,                    help="Delay between requests in seconds (default 1.0)")
     parser.add_argument("--output",   type=str,   default="data/blog_words.txt",  help="Output file")
     parser.add_argument("--dry-run",  action="store_true",                        help="Parse sitemaps only, don't scrape pages")

@@ -217,6 +217,10 @@ body {
   flex-direction: column;
   gap: 0.4rem;
   box-shadow: var(--shadow-sm);
+  /* Fixed height so textarea never moves when suggestions appear/disappear */
+  height: 90px;
+  overflow: hidden;
+  flex-shrink: 0;
 }
 
 .suggestion-hint {
@@ -225,6 +229,15 @@ body {
   color: var(--ink-muted);
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.hint-idle {
+  opacity: 0.4;
+  font-style: italic;
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .suggestion-hint kbd {
@@ -241,8 +254,13 @@ body {
 
 .suggestion-pills {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0.5rem;
+  overflow: hidden;
+}
+
+.pills-placeholder {
+  height: 44px;
 }
 
 .suggestion-pill {

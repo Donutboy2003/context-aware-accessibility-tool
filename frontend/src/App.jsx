@@ -168,8 +168,47 @@ export default function App() {
 
   // ── Mic recording ──────────────────────────────────────────────────────────
   useEffect(() => {
-    let recorder;
     let stream;
+    let intervalId;
+    let active = true;
+
+    const sendChunk = async (blob) => {
+      if (!active || blob.size < 1000) return;
+      setMicStatus("processing");
+      const form = new FormData();
+      form.append("audio", blob, "chunk.webm");
+      try {
+        const res = await fetch(`${API}/transcribe`, { method: "POST", body: form });
+        if (res.ok) {
+          const { transcript } = await res.json();
+          if (transcript) {
+            setMicTranscript((prev) => {
+              const words = (prev + " " + transcript).trim().split(/\s+/);
+              return words.slice(-MIC_WINDOW_WORDS).join(" ");
+            });
+          }
+        }
+      } catch {
+        // Transcription failed — keep going
+      } finally {
+        if (active) setMicStatus("listening");
+      }
+    };
+
+    const recordChunk = (stream) => {
+      // Each call creates a fresh recorder → fresh complete WebM file ffmpeg can parse
+      const chunks = [];
+      let mimeType = "audio/webm;codecs=opus";
+      if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = "audio/webm";
+      const recorder = new MediaRecorder(stream, { mimeType });
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: mimeType });
+        sendChunk(blob);
+      };
+      recorder.start();
+      return recorder;
+    };
 
     const start = async () => {
       try {
@@ -177,38 +216,15 @@ export default function App() {
         streamRef.current = stream;
         setMicStatus("listening");
 
-        recorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
-        recorderRef.current = recorder;
+        let currentRecorder = recordChunk(stream);
 
-        recorder.ondataavailable = async (e) => {
-          if (e.data.size < 1000) return; // skip near-empty chunks
+        intervalId = setInterval(() => {
+          if (!active) return;
+          // Stop current recorder (triggers onstop → sendChunk), start fresh one
+          currentRecorder.stop();
+          currentRecorder = recordChunk(stream);
+        }, CHUNK_INTERVAL_MS);
 
-          setMicStatus("processing");
-          const form = new FormData();
-          form.append("audio", e.data, "chunk.webm");
-
-          try {
-            const res = await fetch(`${API}/transcribe`, {
-              method: "POST",
-              body: form,
-            });
-            if (res.ok) {
-              const { transcript } = await res.json();
-              if (transcript) {
-                setMicTranscript((prev) => {
-                  const words = (prev + " " + transcript).trim().split(/\s+/);
-                  return words.slice(-MIC_WINDOW_WORDS).join(" ");
-                });
-              }
-            }
-          } catch {
-            // Transcription failed — keep going
-          } finally {
-            setMicStatus("listening");
-          }
-        };
-
-        recorder.start(CHUNK_INTERVAL_MS);
       } catch (err) {
         console.error("Mic access denied:", err);
         setMicStatus("error");
@@ -218,7 +234,8 @@ export default function App() {
     start();
 
     return () => {
-      if (recorder && recorder.state !== "inactive") recorder.stop();
+      active = false;
+      clearInterval(intervalId);
       if (stream) stream.getTracks().forEach((t) => t.stop());
     };
   }, []);
