@@ -1,0 +1,22 @@
+version: "3.8"
+
+services:
+  backend:
+    build: ./backend
+    container_name: islamic-assist-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - WHISPER_MODEL=base
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: islamic-assist-frontend
+    ports:
+      - "3000:5173"
+    depends_on:
+      - backend
+    restart: unless-stopped

@@ -1,0 +1,44 @@
+# blog_words.txt
+# ─────────────────────────────────────────────────────────────────────────────
+# Add words from your previous blog writings here — one word per line.
+# These are seeded into the suggestion engine with a higher base frequency,
+# so they appear more prominently in suggestions.
+#
+# Lines starting with # are ignored.
+# Words are case-insensitive (internally stored lowercase).
+#
+# INSTRUCTIONS:
+# 1. Copy-paste word lists extracted from your blog posts here
+# 2. Or run the helper script: python extract_blog_words.py your_blog.txt
+# 3. Save the file and restart the app (docker compose restart backend)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Example entries (replace with your own):
+tazkiyah
+khuluq
+mujahada
+musharatah
+murakaba
+muhasabah
+mutabaa
+tawbah
+inabah
+istiqamah
+tawadu
+hilm
+sakhaa
+shuja
+adl
+wafa
+sidq
+haya
+barakah
+rizq
+tawfiq
+hidayah
+noor
+baseerah
+qalb
+nafs
+ruh
+aql
