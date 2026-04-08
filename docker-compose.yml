@@ -10,6 +10,9 @@ services:
       - ./data:/app/data
     environment:
       - WHISPER_MODEL=base
+      - CEREBRAS_API_KEY=${CEREBRAS_API_KEY:-}
+      - CEREBRAS_MODEL=${CEREBRAS_MODEL:-llama3.1-8b}
+      - USE_LLM=${USE_LLM:-1}
     restart: unless-stopped
 
   frontend:
