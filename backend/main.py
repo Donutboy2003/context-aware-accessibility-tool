@@ -9,9 +9,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from database import Database
+from llm_client import llm_complete
 from transcriber import transcribe_audio
 from trie import Trie
 from word_list import ISLAMIC_WORDS
+
+# ── LLM config ─────────────────────────────────────────────────────────────────
+CEREBRAS_API_KEY = os.getenv("CEREBRAS_API_KEY", "").strip()
+USE_LLM = bool(CEREBRAS_API_KEY) and os.getenv("USE_LLM", "1") != "0"
+print(f"[Startup] LLM suggestions: {'ENABLED (Cerebras)' if USE_LLM else 'disabled'}")
 
 # ── App setup ──────────────────────────────────────────────────────────────────
 
@@ -63,6 +69,7 @@ class SuggestRequest(BaseModel):
 
 class SuggestResponse(BaseModel):
     suggestions: list[str]
+    source: str = "trie"  # "trie", "llm", or "hybrid"
 
 class LearnRequest(BaseModel):
     selected_word: str
@@ -126,27 +133,48 @@ def health():
 
 
 @app.post("/suggest", response_model=SuggestResponse)
-def suggest(req: SuggestRequest):
+async def suggest(req: SuggestRequest):
     prefix = req.prefix.strip()
     if not prefix:
-        return SuggestResponse(suggestions=[])
+        return SuggestResponse(suggestions=[], source="trie")
 
-    # Get trie candidates (returns up to 30 prefix matches)
+    # ── 1. Trie candidates (always run — instant + offline-safe) ──
     candidates = trie.search_prefix(prefix, max_results=30)
-    if not candidates:
-        return SuggestResponse(suggestions=[])
-
-    # Build mic context word set
     mic_words = {w.lower() for w in req.mic_transcript.split() if len(w) > 2}
-
     prev_word = req.prev_words[-1].lower() if req.prev_words else None
 
-    # Score and rank
-    scored = score_candidates(candidates, prefix, prev_word, mic_words)
-    scored.sort(key=lambda x: -x[1])
+    trie_top: list[str] = []
+    if candidates:
+        scored = score_candidates(candidates, prefix, prev_word, mic_words)
+        scored.sort(key=lambda x: -x[1])
+        trie_top = [w for w, _ in scored[:8]]
 
-    top = [word for word, _ in scored[:8]]
-    return SuggestResponse(suggestions=top)
+    # ── 2. LLM completions (if enabled) ──
+    if not USE_LLM:
+        return SuggestResponse(suggestions=trie_top, source="trie")
+
+    prev_text = " ".join(req.prev_words[-20:])
+    llm_top = await llm_complete(
+        prefix=prefix,
+        prev_text=prev_text,
+        mic_transcript=req.mic_transcript,
+        api_key=CEREBRAS_API_KEY,
+    )
+
+    if not llm_top:
+        return SuggestResponse(suggestions=trie_top, source="trie")
+
+    # ── 3. Merge: LLM order first, then trie fillers, dedupe ──
+    merged: list[str] = []
+    seen: set[str] = set()
+    for w in llm_top + trie_top:
+        if w not in seen:
+            seen.add(w)
+            merged.append(w)
+        if len(merged) >= 8:
+            break
+
+    return SuggestResponse(suggestions=merged, source="hybrid")
 
 
 @app.post("/learn", response_model=LearnResponse)
